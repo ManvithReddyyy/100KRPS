@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>SafePath Live</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;550;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+
+  <style>
+    :root {
+      --bg: #fefdfb;
+      --bg-subtle: #f4f3f0;
+      --text: #1b1a18;
+      --muted: #8c8f96;
+      --border: #e8e6e1;
+      --accent: #d4f250;
+      --dark: #1b1a18;
+      --green: #047e4a;
+      --blue: #038ff7;
+      --radius-btn: 12px;
+      --radius-card: 16px;
+      --radius-pill: 9999px;
+      --shadow: 0 4px 20px -2px rgba(27, 26, 24, 0.08), 0 1px 3px rgba(27, 26, 24, 0.04);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; -webkit-font-smoothing: antialiased; }
+
+    body { background-color: var(--bg-subtle); color: var(--text); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+    #map .leaflet-tile { filter: saturate(0.65) contrast(1.05) brightness(1.02); }
+
+    /* Header */
+    header { background: var(--bg); border-bottom: 1px solid var(--border); height: 52px; padding: 0 20px; display: flex; align-items: center; justify-content: space-between; z-index: 1000; }
+    .brand { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 550; letter-spacing: -0.2px; color: var(--text); }
+    .header-actions { display: flex; align-items: center; gap: 8px; }
+    .segmented-control { display: flex; background: var(--bg-subtle); border: 1px solid var(--border); border-radius: 9px; padding: 2px; gap: 2px; }
+    .segmented-control button { background: transparent; border: none; font-size: 12px; font-weight: 500; color: var(--muted); padding: 4px 12px; border-radius: 7px; cursor: pointer; transition: all 0.15s ease; }
+    .segmented-control button.active { background: var(--bg); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+
+    .btn-history { background: var(--bg-subtle); border: 1px solid var(--border); border-radius: 9px; height: 32px; padding: 0 10px; display: flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 500; color: var(--text); cursor: pointer; transition: all 0.15s; position: relative; }
+    .btn-history:hover { background: #eae8e3; }
+    .btn-history.on { border-color: var(--dark); }
+    .h-badge { background: var(--dark); color: var(--bg); font-size: 9px; font-weight: 600; border-radius: var(--radius-pill); padding: 1px 5px; line-height: 1.2; }
+
+    /* Map */
+    main { flex: 1; position: relative; }
+    #map { height: 100%; width: 100%; }
+
+    /* Top Search Bar */
+    .top-search-wrapper { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); width: 440px; max-width: calc(100vw - 32px); z-index: 500; }
+    .search-input-group { position: relative; display: flex; align-items: center; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-btn); box-shadow: var(--shadow); height: 42px; transition: border-color 0.15s; }
+    .search-input-group:focus-within { border-color: var(--dark); }
+    .search-icon { position: absolute; left: 14px; color: var(--muted); pointer-events: none; display: flex; align-items: center; }
+    .search-input { width: 100%; height: 100%; background: transparent; border: none; outline: none; font-size: 13px; color: var(--text); padding: 0 36px 0 38px; }
+    .search-input::placeholder { color: var(--muted); }
+    .search-clear { position: absolute; right: 12px; background: transparent; border: none; color: var(--muted); cursor: pointer; font-size: 12px; padding: 4px; display: none; }
+    .search-clear:hover { color: var(--text); }
+
+    .search-results { display: none; position: absolute; top: 48px; left: 0; right: 0; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-btn); box-shadow: var(--shadow); max-height: 240px; overflow-y: auto; z-index: 600; }
+    .search-item { padding: 10px 14px; cursor: pointer; border-bottom: 1px solid var(--border); transition: background 0.12s; }
+    .search-item:last-child { border-bottom: none; }
+    .search-item:hover { background: var(--bg-subtle); }
+    .search-name { font-size: 13px; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .search-sub { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+
+    /* Zoom + Locate controls */
+    .leaflet-top.leaflet-right { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; margin-right: 16px; }
+    .leaflet-control-zoom { border: 1px solid var(--border) !important; box-shadow: var(--shadow) !important; border-radius: 8px !important; overflow: hidden; margin: 0 !important; }
+    .leaflet-control-zoom a { background: var(--bg) !important; color: var(--text) !important; border-color: var(--border) !important; }
+    .locate-control { background: var(--bg); border: 1px solid var(--border); box-shadow: var(--shadow); border-radius: 8px; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--text); transition: background 0.15s; }
+    .locate-control:hover { background: var(--bg-subtle); }
+    .locate-control.active { color: var(--blue); }
+
+    /* Category Toggle Pills */
+    .category-bar { position: absolute; top: 68px; left: 50%; transform: translateX(-50%); display: flex; gap: 6px; z-index: 500; flex-wrap: wrap; justify-content: center; max-width: calc(100vw - 32px); }
+    .cat-pill { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-pill); padding: 5px 12px; font-size: 11px; font-weight: 500; color: var(--muted); cursor: pointer; display: flex; align-items: center; box-shadow: var(--shadow); transition: all 0.18s; white-space: nowrap; user-select: none; }
+    .cat-pill:hover { border-color: #d0cec7; color: var(--text); }
+    .cat-pill.on { background: var(--dark); color: var(--bg); border-color: var(--dark); }
+
+    /* Animated POI Infrastructure Labels (Zero emojis) */
+    .poi-marker { display: inline-flex; align-items: center; justify-content: center; padding: 3px 6px; border-radius: 6px; font-size: 9.5px; font-weight: 600; font-family: 'JetBrains Mono', monospace; letter-spacing: 0.5px; background: var(--bg); border: 1px solid var(--border); color: var(--text); box-shadow: 0 2px 8px rgba(0,0,0,0.12); white-space: nowrap; animation: poi-pop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); cursor: pointer; }
+    @keyframes poi-pop {
+      0% { transform: scale(0.4) translateY(6px); opacity: 0; }
+      100% { transform: scale(1) translateY(0); opacity: 1; }
+    }
+    .poi-restaurant { border-color: #f59e0b; color: #b45309; }
+    .poi-hospital { border-color: #ef4444; color: #b91c1c; }
+    .poi-school { border-color: #3b82f6; color: #1d4ed8; }
+    .poi-park { border-color: #10b981; color: #047857; }
+    .poi-pharmacy { border-color: #8b5cf6; color: #6d28d9; }
+    .poi-fuel { border-color: #f97316; color: #c2410c; }
+    .poi-atm { border-color: #06b6d4; color: #0e7490; }
+
+    /* Bottom Dock */
+    .dock { position: absolute; bottom: 24px; left: 24px; width: 360px; max-width: calc(100vw - 48px); background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 18px; z-index: 500; box-shadow: var(--shadow); }
+    .row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    .title { font-size: 14px; font-weight: 550; letter-spacing: -0.2px; }
+    .destination-preview { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
+
+    .btn { width: 100%; height: 42px; border-radius: var(--radius-btn); font-size: 13px; font-weight: 550; display: flex; align-items: center; justify-content: center; gap: 6px; border: none; cursor: pointer; transition: opacity 0.15s, transform 0.1s; }
+    .btn:active { transform: scale(0.99); }
+    .btn-accent { background: var(--accent); color: var(--dark); }
+    .btn-accent:hover { opacity: 0.92; }
+    .btn-dark { background: var(--dark); color: var(--bg); }
+    .btn-dark:hover { opacity: 0.9; }
+    .btn-subtle { background: var(--bg-subtle); color: var(--text); border: 1px solid var(--border); }
+    .btn-subtle:hover { background: #eae8e3; }
+    .btn-link { background: transparent; color: var(--muted); height: 32px; font-size: 12px; font-weight: 450; margin-top: 6px; }
+    .btn-link:hover { color: var(--text); }
+
+    .status-pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: var(--radius-pill); font-size: 11px; font-weight: 500; background: var(--bg-subtle); color: var(--muted); border: 1px solid var(--border); }
+    .status-pill.active { background: #f0fdf4; color: var(--green); border-color: #dcfce7; }
+    .share-row { display: flex; align-items: center; justify-content: space-between; background: var(--bg-subtle); border: 1px solid var(--border); border-radius: var(--radius-btn); padding: 8px 12px; margin: 12px 0; }
+    .share-code { font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 500; letter-spacing: 1px; }
+    .btn-copy { background: var(--bg); border: 1px solid var(--border); color: var(--text); font-size: 11px; font-weight: 500; padding: 4px 8px; border-radius: 6px; cursor: pointer; }
+    .btn-copy:hover { background: #fdfdfd; }
+    .metrics-row { display: flex; gap: 16px; margin: 14px 0 16px; padding-top: 10px; border-top: 1px solid var(--border); }
+    .metric { flex: 1; }
+    .metric-label { font-size: 11px; color: var(--muted); margin-bottom: 2px; }
+    .metric-val { font-size: 16px; font-weight: 550; letter-spacing: -0.3px; }
+    .arrival-badge { display: none; background: var(--green); color: #fff; font-size: 12px; font-weight: 500; text-align: center; padding: 8px; border-radius: 8px; margin-bottom: 12px; }
+
+    input[type="text"].dock-input { width: 100%; height: 40px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-btn); padding: 0 12px; font-size: 13px; color: var(--text); outline: none; }
+    input[type="text"].dock-input:focus { border-color: var(--dark); }
+
+    /* History Popover */
+    .hist-pop { display: none; position: absolute; top: 52px; right: 0; width: 340px; max-width: calc(100vw - 24px); background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-card); box-shadow: 0 12px 40px -8px rgba(27,26,24,0.14); z-index: 1200; overflow: hidden; }
+    .hist-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-bottom: 1px solid var(--border); }
+    .hist-title { font-size: 13px; font-weight: 600; }
+    .hist-clear { background: transparent; border: none; color: var(--muted); font-size: 11px; cursor: pointer; }
+    .hist-clear:hover { color: #ee0000; }
+    .hist-body { max-height: 300px; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 6px; }
+    .hist-empty { padding: 24px 14px; text-align: center; font-size: 12px; color: var(--muted); }
+    .hist-card { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 5px; transition: border-color 0.12s; }
+    .hist-card:hover { border-color: #d0cec7; }
+    .hist-top { display: flex; align-items: center; justify-content: space-between; }
+    .hist-code { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 600; letter-spacing: 0.5px; }
+    .hist-role { font-size: 10px; font-weight: 500; padding: 2px 6px; border-radius: var(--radius-pill); text-transform: uppercase; letter-spacing: 0.3px; }
+    .hist-role.cr { background: #ecfdf5; color: var(--green); }
+    .hist-role.vw { background: #eff6ff; color: var(--blue); }
+    .hist-dest { font-size: 12px; color: var(--text); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .hist-foot { display: flex; align-items: center; justify-content: space-between; }
+    .hist-time { font-size: 11px; color: var(--muted); }
+    .hist-actions { display: flex; gap: 4px; }
+    .hist-btn { background: var(--bg-subtle); border: 1px solid var(--border); font-size: 11px; font-weight: 500; padding: 3px 8px; border-radius: 6px; cursor: pointer; color: var(--text); transition: background 0.12s; }
+    .hist-btn:hover { background: #eae8e3; }
+    .hist-btn.pr { background: var(--accent); color: var(--dark); border-color: transparent; font-weight: 600; }
+
+    @media (max-width: 600px) {
+      .top-search-wrapper { top: 12px; }
+      .category-bar { top: 60px; }
+      .dock { left: 12px; right: 12px; bottom: 12px; width: auto; }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">SafePath</div>
+    <div class="header-actions">
+      <div class="segmented-control">
+        <button class="active" id="tab-start" onclick="switchMode('start')">Create</button>
+        <button id="tab-track" onclick="switchMode('track')">Track</button>
+      </div>
+      <div style="position:relative;">
+        <button class="btn-history" id="btn-hist" onclick="toggleHist()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+          History
+          <span class="h-badge" id="h-count" style="display:none;">0</span>
+        </button>
+        <div class="hist-pop" id="hist-pop">
+          <div class="hist-head">
+            <span class="hist-title">Trip History</span>
+            <button class="hist-clear" onclick="clearHistory()">Clear</button>
+          </div>
+          <div class="hist-body" id="hist-body"></div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div id="map"></div>
+
+    <!-- Top Search Bar -->
+    <div class="top-search-wrapper" id="top-search-bar">
+      <div class="search-input-group">
+        <span class="search-icon">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        </span>
+        <input type="text" id="place-search" class="search-input" placeholder="Search area, destination, restaurant..." autocomplete="off">
+        <button id="search-clear-btn" class="search-clear" onclick="clearSearch()">&#x2715;</button>
+      </div>
+      <div class="search-results" id="search-dropdown"></div>
+    </div>
+
+    <!-- Category Filter Pills (No emojis) -->
+    <div class="category-bar" id="category-bar">
+      <div class="cat-pill" data-cat="restaurant" onclick="toggleCat(this)">Restaurants</div>
+      <div class="cat-pill" data-cat="hospital" onclick="toggleCat(this)">Hospitals</div>
+      <div class="cat-pill" data-cat="school" onclick="toggleCat(this)">Schools</div>
+      <div class="cat-pill" data-cat="park" onclick="toggleCat(this)">Parks</div>
+      <div class="cat-pill" data-cat="pharmacy" onclick="toggleCat(this)">Pharmacies</div>
+      <div class="cat-pill" data-cat="fuel" onclick="toggleCat(this)">Fuel</div>
+      <div class="cat-pill" data-cat="atm" onclick="toggleCat(this)">ATMs</div>
+    </div>
+
+    <!-- Creator Dock -->
+    <div class="dock" id="panel-start">
+      <div id="create-view">
+        <div class="row">
+          <div class="title">Destination</div>
+          <span class="destination-preview" id="target-hint">Click map or search above</span>
+        </div>
+        <button class="btn btn-accent" id="btn-start-trip" onclick="startTrip()" style="margin-top: 6px;">Start trip</button>
+      </div>
+
+      <div id="sender-active-view" style="display: none;">
+        <div class="arrival-badge" id="sender-arrived">Arrived at destination</div>
+        <div class="row">
+          <span class="status-pill active" id="sender-status">Active</span>
+          <span class="destination-preview" id="sender-timer">Broadcasting location</span>
+        </div>
+        <div class="share-row">
+          <span class="share-code" id="sender-code">--------</span>
+          <button class="btn-copy" onclick="copyLink()">Copy link</button>
+        </div>
+        <div class="metrics-row">
+          <div class="metric"><div class="metric-label">Remaining</div><div class="metric-val" id="sender-dist">-- m</div></div>
+          <div class="metric"><div class="metric-label">Speed</div><div class="metric-val" id="sender-speed">0 km/h</div></div>
+        </div>
+        <button class="btn btn-dark" id="btn-sim" onclick="toggleSim()">Simulate movement</button>
+        <button class="btn btn-link" onclick="endTripManual()">End trip early</button>
+      </div>
+    </div>
+
+    <!-- Viewer Dock -->
+    <div class="dock" id="panel-track" style="display: none;">
+      <div id="track-input-view">
+        <div class="row"><div class="title">Track Trip</div></div>
+        <div style="margin-bottom: 12px;">
+          <input type="text" id="track-code" class="dock-input" placeholder="Enter share code (e.g. 7X8K2M9P)" maxlength="12" style="font-family: 'JetBrains Mono', monospace; text-transform: uppercase;">
+        </div>
+        <button class="btn btn-accent" onclick="connectTrack(document.getElementById('track-code').value.trim().toUpperCase())">Connect</button>
+      </div>
+
+      <div id="track-active-view" style="display: none;">
+        <div class="arrival-badge" id="viewer-arrived">Trip completed</div>
+        <div class="row">
+          <span class="status-pill active" id="viewer-status">Live</span>
+          <span class="destination-preview" id="viewer-subtext">Connected</span>
+        </div>
+        <div class="metrics-row">
+          <div class="metric"><div class="metric-label">Distance to goal</div><div class="metric-val" id="viewer-dist">-- m</div></div>
+          <div class="metric"><div class="metric-label">Speed</div><div class="metric-val" id="viewer-speed">-- km/h</div></div>
+        </div>
+        <button class="btn btn-subtle" onclick="disconnectTrack()">Disconnect</button>
+      </div>
+    </div>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script>
+    // ── Map ──
+    const map = L.map('map', { zoomControl: false }).setView([17.3850, 78.4867], 13);
+    L.control.zoom({ position: 'topright' }).addTo(map);
+
+    // Locate control
+    let locateBtnEl = null;
+    const LocateControl = L.Control.extend({
+      options: { position: 'topright' },
+      onAdd: function() {
+        const btn = L.DomUtil.create('button', 'locate-control');
+        locateBtnEl = btn;
+        btn.title = "Center on my location";
+        btn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line></svg>';
+        btn.onclick = (e) => { e.stopPropagation(); detectCurrentLocation(true); };
+        return btn;
+      }
+    });
+    map.addControl(new LocateControl());
+
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap' }).addTo(map);
+
+    // ── State ──
+    let userCurrentLocation = null, currentLocationMarker = null;
+    let selectedDest = null, destMarker = null, destCircle = null, userMarker = null;
+    let pathLine = L.polyline([], { color: '#1b1a18', weight: 2.5, opacity: 0.85, lineJoin: 'round' }).addTo(map);
+    let activeTrip = null, currentMode = 'start', watchId = null, simTimer = null, isSimulating = false;
+    let eventSource = null, searchDebounce = null;
+
+    const SESSION_KEY = 'safepath_active_trip';
+    const HISTORY_KEY = 'safepath_trip_history';
+
+    // ── Category POI State ──
+    const poiLayers = {}; // { restaurant: L.layerGroup, ... }
+    const poiCache = {}; // { "restaurant_17.38_78.49": [...], ... }
+    const activeCats = new Set();
+
+    const CAT_CONFIG = {
+      restaurant: { query: 'amenity=restaurant', label: 'REST', css: 'poi-restaurant' },
+      hospital:   { query: 'amenity=hospital',   label: 'HOSP', css: 'poi-hospital' },
+      school:     { query: 'amenity=school',      label: 'SCH',  css: 'poi-school' },
+      park:       { query: 'leisure=park',         label: 'PARK', css: 'poi-park' },
+      pharmacy:   { query: 'amenity=pharmacy',    label: 'PHARM',css: 'poi-pharmacy' },
+      fuel:       { query: 'amenity=fuel',         label: 'FUEL', css: 'poi-fuel' },
+      atm:        { query: 'amenity=atm',          label: 'ATM',  css: 'poi-atm' },
+    };
+
+    // ── SVG Markers ──
+    function createPin(type) {
+      if (type === 'current') {
+        return L.divIcon({ className: 'current-pos-pin', html: '<svg width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="rgba(3, 143, 247, 0.15)"/><circle cx="12" cy="12" r="5.5" fill="#038ff7" stroke="#ffffff" stroke-width="2"/></svg>', iconSize: [24, 24], iconAnchor: [12, 12] });
+      }
+      const isTarget = type === 'target';
+      const color = isTarget ? '#1b1a18' : '#047e4a';
+      const inner = isTarget ? '<rect x="7" y="7" width="6" height="6" fill="#fefdfb"/>' : '<circle cx="10" cy="10" r="4" fill="#d4f250"/>';
+      return L.divIcon({ className: 'custom-pin', html: `<svg width="20" height="20" viewBox="0 0 20 20" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.18));"><circle cx="10" cy="10" r="9" fill="${color}" stroke="#ffffff" stroke-width="2"/>${inner}</svg>`, iconSize: [20, 20], iconAnchor: [10, 10] });
+    }
+
+    function createPOIIcon(cat) {
+      const cfg = CAT_CONFIG[cat];
+      return L.divIcon({
+        className: '',
+        html: `<div class="poi-marker ${cfg.css}">${cfg.label}</div>`,
+        iconSize: [40, 20],
+        iconAnchor: [20, 10],
+        popupAnchor: [0, -12]
+      });
+    }
+
+    // ── Location Detection ──
+    async function detectCurrentLocation(flyTo = true) {
+      if (locateBtnEl) locateBtnEl.classList.add('active');
+      const apply = (lat, lng) => {
+        userCurrentLocation = { lat, lng };
+        if (currentLocationMarker) currentLocationMarker.setLatLng([lat, lng]);
+        else currentLocationMarker = L.marker([lat, lng], { icon: createPin('current') }).addTo(map);
+        if (flyTo || !destMarker) map.flyTo([lat, lng], 15, { duration: 1.2 });
+        if (locateBtnEl) locateBtnEl.classList.remove('active');
+      };
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => apply(pos.coords.latitude, pos.coords.longitude),
+          () => {
+            navigator.geolocation.getCurrentPosition(
+              (pos2) => apply(pos2.coords.latitude, pos2.coords.longitude),
+              () => fallbackToIP(apply),
+              { enableHighAccuracy: false, timeout: 5000, maximumAge: 300000 }
+            );
+          },
+          { enableHighAccuracy: true, timeout: 4000, maximumAge: 60000 }
+        );
+      } else fallbackToIP(apply);
+    }
+
+    async function fallbackToIP(apply) {
+      try {
+        const res = await fetch('https://ipapi.co/json/');
+        if (!res.ok) throw 0;
+        const data = await res.json();
+        if (data.latitude && data.longitude) apply(data.latitude, data.longitude);
+      } catch { if (locateBtnEl) locateBtnEl.classList.remove('active'); }
+    }
+    detectCurrentLocation(true);
+
+    // ── Category POI Toggle ──
+    function toggleCat(el) {
+      const cat = el.dataset.cat;
+      if (activeCats.has(cat)) {
+        activeCats.delete(cat);
+        el.classList.remove('on');
+        if (poiLayers[cat]) { map.removeLayer(poiLayers[cat]); delete poiLayers[cat]; }
+      } else {
+        activeCats.add(cat);
+        el.classList.add('on');
+        loadPOIs(cat);
+      }
+    }
+
+    async function loadPOIs(cat) {
+      const center = map.getCenter();
+      const cacheKey = `${cat}_${center.lat.toFixed(2)}_${center.lng.toFixed(2)}`;
+
+      if (poiCache[cacheKey]) {
+        renderPOIs(cat, poiCache[cacheKey]);
+        return;
+      }
+
+      const cfg = CAT_CONFIG[cat];
+      const bounds = map.getBounds();
+      const s = bounds.getSouth(), w = bounds.getWest(), n = bounds.getNorth(), e = bounds.getEast();
+
+      const query = `[out:json][timeout:8];node[${cfg.query}](${s},${w},${n},${e});out body 40;`;
+
+      try {
+        const res = await fetch('https://overpass-api.de/api/interpreter', {
+          method: 'POST',
+          body: 'data=' + encodeURIComponent(query)
+        });
+        if (!res.ok) throw 0;
+        const data = await res.json();
+        const pois = (data.elements || []).map(el => ({
+          lat: el.lat, lng: el.lon,
+          name: (el.tags && el.tags.name) || cat.charAt(0).toUpperCase() + cat.slice(1)
+        }));
+        poiCache[cacheKey] = pois;
+        renderPOIs(cat, pois);
+      } catch {
+        // Silently fail — user can retry
+      }
+    }
+
+    function renderPOIs(cat, pois) {
+      if (poiLayers[cat]) map.removeLayer(poiLayers[cat]);
+      const group = L.layerGroup();
+      pois.forEach((p, i) => {
+        const marker = L.marker([p.lat, p.lng], { icon: createPOIIcon(cat) });
+        marker.bindPopup(`<div style="font-family:Inter,sans-serif;font-size:12px;font-weight:500;padding:2px 4px;min-width:100px;">${escapeHtml(p.name)}</div>`, { closeButton: false, className: 'poi-popup' });
+        // Stagger animation
+        setTimeout(() => group.addLayer(marker), i * 30);
+      });
+      poiLayers[cat] = group;
+      group.addTo(map);
+    }
+
+    // Reload POIs when map moves
+    let poiReloadTimer = null;
+    map.on('moveend', () => {
+      clearTimeout(poiReloadTimer);
+      poiReloadTimer = setTimeout(() => {
+        activeCats.forEach(cat => loadPOIs(cat));
+      }, 600);
+    });
+
+    // ── Search ──
+    const searchInput = document.getElementById('place-search');
+    const searchDropdown = document.getElementById('search-dropdown');
+    const searchClearBtn = document.getElementById('search-clear-btn');
+
+    searchInput.addEventListener('input', (e) => {
+      const q = e.target.value.trim();
+      searchClearBtn.style.display = q.length > 0 ? 'block' : 'none';
+      clearTimeout(searchDebounce);
+      if (q.length < 2) { searchDropdown.style.display = 'none'; return; }
+      searchDebounce = setTimeout(() => executeSearch(q), 250);
+    });
+
+    function clearSearch() { searchInput.value = ''; searchClearBtn.style.display = 'none'; searchDropdown.style.display = 'none'; }
+
+    async function executeSearch(query) {
+      try {
+        let url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=5`;
+        if (userCurrentLocation) url += `&lat=${userCurrentLocation.lat}&lon=${userCurrentLocation.lng}`;
+        const res = await fetch(url);
+        if (!res.ok) throw 0;
+        const data = await res.json();
+        if (!data.features || !data.features.length) {
+          searchDropdown.innerHTML = '<div class="search-item" style="color:var(--muted); font-size:12px;">No matching places found</div>';
+          searchDropdown.style.display = 'block';
+          return;
+        }
+        searchDropdown.innerHTML = '';
+        data.features.forEach((f) => {
+          const props = f.properties, coords = f.geometry.coordinates;
+          const name = props.name || props.street || query;
+          const sub = [props.street, props.district, props.city, props.state, props.country].filter(Boolean).slice(0, 3).join(', ');
+          const item = document.createElement('div');
+          item.className = 'search-item';
+          item.innerHTML = `<div class="search-name">${escapeHtml(name)}</div><div class="search-sub">${escapeHtml(sub)}</div>`;
+          item.onclick = () => selectSearchResult(name, coords[1], coords[0]);
+          searchDropdown.appendChild(item);
+        });
+        searchDropdown.style.display = 'block';
+      } catch {}
+    }
+
+    function selectSearchResult(name, lat, lng) {
+      searchInput.value = name;
+      searchDropdown.style.display = 'none';
+      searchClearBtn.style.display = 'block';
+      selectedDest = { lat, lng, name, radius: 50, expiry: 60 };
+      document.getElementById('target-hint').innerText = name;
+      drawTarget(lat, lng, 50);
+      map.flyTo([lat, lng], 16, { duration: 1.4 });
+    }
+
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('#top-search-bar')) searchDropdown.style.display = 'none';
+      if (!e.target.closest('#hist-pop') && !e.target.closest('#btn-hist')) {
+        document.getElementById('hist-pop').style.display = 'none';
+        document.getElementById('btn-hist').classList.remove('on');
+      }
+    });
+
+    // ── Mode Switch ──
+    function switchMode(mode) {
+      currentMode = mode;
+      document.getElementById('tab-start').classList.toggle('active', mode === 'start');
+      document.getElementById('tab-track').classList.toggle('active', mode === 'track');
+      document.getElementById('panel-start').style.display = mode === 'start' ? 'block' : 'none';
+      document.getElementById('panel-track').style.display = mode === 'track' ? 'block' : 'none';
+      document.getElementById('top-search-bar').style.display = mode === 'start' && !activeTrip ? 'block' : 'none';
+    }
+
+    // ── Map Target Click ──
+    map.on('click', (e) => {
+      if (currentMode === 'start' && !activeTrip) {
+        const lat = parseFloat(e.latlng.lat.toFixed(5));
+        const lng = parseFloat(e.latlng.lng.toFixed(5));
+        const label = `${lat}, ${lng}`;
+        selectedDest = { lat, lng, name: label, radius: 50, expiry: 60 };
+        searchInput.value = label;
+        searchClearBtn.style.display = 'block';
+        document.getElementById('target-hint').innerText = label;
+        drawTarget(lat, lng, 50);
+      }
+    });
+
+    function drawTarget(lat, lng, radius) {
+      if (destMarker) map.removeLayer(destMarker);
+      if (destCircle) map.removeLayer(destCircle);
+      destMarker = L.marker([lat, lng], { icon: createPin('target') }).addTo(map);
+      destCircle = L.circle([lat, lng], { radius, color: '#1b1a18', fillColor: '#1b1a18', fillOpacity: 0.05, weight: 1, dashArray: '3, 3' }).addTo(map);
+    }
+
+    // ── Start Trip ──
+    async function startTrip() {
+      if (!selectedDest) { alert('Please search for a destination or click on the map.'); return; }
+      try {
+        const res = await fetch('/v1/trips', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ dest_lat: selectedDest.lat, dest_lng: selectedDest.lng, arrival_radius_m: selectedDest.radius, expires_in_minutes: selectedDest.expiry })
+        });
+        if (!res.ok) throw new Error(await res.text());
+        const data = await res.json();
+        activeTrip = { share_code: data.share_code, owner_token: data.owner_token, dest_lat: selectedDest.lat, dest_lng: selectedDest.lng, radius_m: selectedDest.radius, dest_name: selectedDest.name };
+        sessionStorage.setItem(SESSION_KEY, JSON.stringify(activeTrip));
+        showActiveTripUI();
+        saveHist({ code: data.share_code, owner_token: data.owner_token, dest_name: selectedDest.name, dest_lat: selectedDest.lat, dest_lng: selectedDest.lng, created_at: Date.now(), role: 'creator', status: 'active' });
+        drawTarget(selectedDest.lat, selectedDest.lng, selectedDest.radius);
+        startGPS();
+      } catch (err) { alert('Failed to start trip: ' + err.message); }
+    }
+
+    function showActiveTripUI() {
+      document.getElementById('create-view').style.display = 'none';
+      document.getElementById('sender-active-view').style.display = 'block';
+      document.getElementById('top-search-bar').style.display = 'none';
+      document.getElementById('sender-code').innerText = activeTrip.share_code;
+    }
+
+    function startGPS() {
+      if (!navigator.geolocation) return;
+      watchId = navigator.geolocation.watchPosition(
+        (pos) => sendCoord(pos.coords.latitude, pos.coords.longitude, pos.coords.speed || 0),
+        (err) => console.warn(err),
+        { enableHighAccuracy: true, timeout: 5000, maximumAge: 1000 }
+      );
+    }
+
+    async function sendCoord(lat, lng, speedMPS) {
+      if (!activeTrip) return;
+      updateSenderUI(lat, lng, speedMPS);
+      try {
+        const res = await fetch(`/v1/trips/${activeTrip.share_code}/ping`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${activeTrip.owner_token}` },
+          body: JSON.stringify({ lat, lng, speed_mps: speedMPS })
+        });
+        if (res.ok) { const body = await res.json(); if (body.status === 'ARRIVED') onArrive(); }
+      } catch {}
+    }
+
+    function updateSenderUI(lat, lng, speedMPS) {
+      if (!userMarker) userMarker = L.marker([lat, lng], { icon: createPin('user') }).addTo(map);
+      else userMarker.setLatLng([lat, lng]);
+      pathLine.addLatLng([lat, lng]);
+      const dist = distM(lat, lng, activeTrip.dest_lat, activeTrip.dest_lng);
+      document.getElementById('sender-dist').innerText = `${Math.round(dist)} m`;
+      document.getElementById('sender-speed').innerText = `${Math.round(speedMPS * 3.6)} km/h`;
+      if (dist <= activeTrip.radius_m) onArrive();
+    }
+
+    function onArrive() {
+      if (simTimer) clearInterval(simTimer);
+      if (watchId) navigator.geolocation.clearWatch(watchId);
+      document.getElementById('sender-arrived').style.display = 'block';
+      const status = document.getElementById('sender-status');
+      status.innerText = 'Arrived';
+      status.classList.remove('active');
+      document.getElementById('sender-dist').innerText = '0 m';
+      document.getElementById('btn-sim').style.display = 'none';
+      updateHistStatus(activeTrip.share_code, 'arrived');
+      sessionStorage.removeItem(SESSION_KEY);
+    }
+
+    function toggleSim() {
+      if (!activeTrip) return;
+      if (isSimulating) { clearInterval(simTimer); isSimulating = false; document.getElementById('btn-sim').innerText = 'Simulate movement'; return; }
+      isSimulating = true;
+      document.getElementById('btn-sim').innerText = 'Pause simulation';
+      let curLat = activeTrip.dest_lat - 0.0035, curLng = activeTrip.dest_lng - 0.0035;
+      map.setView([curLat, curLng], 16);
+      const steps = 14, dLat = (activeTrip.dest_lat - curLat) / steps, dLng = (activeTrip.dest_lng - curLng) / steps;
+      simTimer = setInterval(() => { curLat += dLat; curLng += dLng; sendCoord(curLat, curLng, 1.4); }, 1000);
+    }
+
+    async function endTripManual() {
+      if (!activeTrip) return;
+      await fetch(`/v1/trips/${activeTrip.share_code}/end`, { method: 'POST', headers: { 'Authorization': `Bearer ${activeTrip.owner_token}` } });
+      onArrive();
+      updateHistStatus(activeTrip.share_code, 'ended');
+    }
+
+    function copyLink() {
+      navigator.clipboard.writeText(`${window.location.origin}/?code=${activeTrip.share_code}`);
+      const btn = document.querySelector('.btn-copy');
+      btn.innerText = 'Copied';
+      setTimeout(() => btn.innerText = 'Copy link', 2000);
+    }
+
+    // ── Viewer Flow (SSE) ──
+    function connectTrack(code) {
+      if (!code) return;
+      disconnectTrack();
+      document.getElementById('track-input-view').style.display = 'none';
+      document.getElementById('track-active-view').style.display = 'block';
+      document.getElementById('top-search-bar').style.display = 'none';
+
+      eventSource = new EventSource(`/v1/trips/${code}/live`);
+      eventSource.addEventListener('snapshot', (e) => {
+        const trip = JSON.parse(e.data);
+        drawTarget(trip.dest_lat, trip.dest_lng, trip.arrival_radius_m || 50);
+        saveHist({ code, dest_name: `Trip ${code}`, dest_lat: trip.dest_lat, dest_lng: trip.dest_lng, created_at: Date.now(), role: 'viewer', status: trip.status === 'ARRIVED' ? 'arrived' : 'active' });
+        if (trip.lat && trip.lng && trip.lat !== 0) updateViewerUI(trip.lat, trip.lng, trip.speed_mps || 0, trip.dest_lat, trip.dest_lng);
+        else map.setView([trip.dest_lat, trip.dest_lng], 15);
+        if (trip.status === 'ARRIVED') onViewerArrive();
+      });
+      eventSource.addEventListener('ping', (e) => {
+        const data = JSON.parse(e.data);
+        const tLat = destMarker ? destMarker.getLatLng().lat : null;
+        const tLng = destMarker ? destMarker.getLatLng().lng : null;
+        updateViewerUI(data.lat, data.lng, data.speed_mps || 0, tLat, tLng);
+        if (data.status === 'ARRIVED') onViewerArrive();
+      });
+      eventSource.addEventListener('arrived', () => { onViewerArrive(); eventSource.close(); });
+    }
+
+    function updateViewerUI(lat, lng, speed, tLat, tLng) {
+      if (!userMarker) { userMarker = L.marker([lat, lng], { icon: createPin('user') }).addTo(map); map.setView([lat, lng], 16); }
+      else userMarker.setLatLng([lat, lng]);
+      pathLine.addLatLng([lat, lng]);
+      document.getElementById('viewer-speed').innerText = `${Math.round(speed * 3.6)} km/h`;
+      if (tLat && tLng) document.getElementById('viewer-dist').innerText = `${Math.round(distM(lat, lng, tLat, tLng))} m`;
+    }
+
+    function onViewerArrive() {
+      document.getElementById('viewer-arrived').style.display = 'block';
+      const status = document.getElementById('viewer-status');
+      status.innerText = 'Arrived';
+      status.classList.remove('active');
+      document.getElementById('viewer-dist').innerText = '0 m';
+    }
+
+    function disconnectTrack() {
+      if (eventSource) { eventSource.close(); eventSource = null; }
+      document.getElementById('track-input-view').style.display = 'block';
+      document.getElementById('track-active-view').style.display = 'none';
+      document.getElementById('viewer-arrived').style.display = 'none';
+      if (currentMode === 'start') document.getElementById('top-search-bar').style.display = 'block';
+    }
+
+    // ── History (localStorage) ──
+    function getHist() { try { return JSON.parse(localStorage.getItem(HISTORY_KEY)) || []; } catch { return []; } }
+    function saveHist(entry) {
+      let h = getHist().filter(i => i.code !== entry.code);
+      h.unshift(entry);
+      if (h.length > 25) h = h.slice(0, 25);
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(h));
+      renderHist();
+    }
+    function updateHistStatus(code, status) {
+      const h = getHist(), i = h.find(t => t.code === code);
+      if (i) { i.status = status; localStorage.setItem(HISTORY_KEY, JSON.stringify(h)); renderHist(); }
+    }
+    function clearHistory() { localStorage.removeItem(HISTORY_KEY); renderHist(); }
+    function toggleHist() {
+      const p = document.getElementById('hist-pop'), b = document.getElementById('btn-hist');
+      const vis = p.style.display === 'block';
+      p.style.display = vis ? 'none' : 'block';
+      b.classList.toggle('on', !vis);
+      if (!vis) renderHist();
+    }
+    function renderHist() {
+      const h = getHist(), badge = document.getElementById('h-count'), body = document.getElementById('hist-body');
+      badge.style.display = h.length ? 'inline-block' : 'none';
+      badge.innerText = h.length;
+      if (!body) return;
+      if (!h.length) { body.innerHTML = '<div class="hist-empty">No trips yet. Create or track a trip to see it here.</div>'; return; }
+      body.innerHTML = '';
+      h.forEach(t => {
+        const el = document.createElement('div');
+        el.className = 'hist-card';
+        const rl = t.role === 'creator' ? 'Created' : 'Tracked', rc = t.role === 'creator' ? 'cr' : 'vw';
+        el.innerHTML = `<div class="hist-top"><span class="hist-code">${escapeHtml(t.code)}</span><span class="hist-role ${rc}">${rl}</span></div><div class="hist-dest" title="${escapeHtml(t.dest_name || '')}">${escapeHtml(t.dest_name || `Trip ${t.code}`)}</div><div class="hist-foot"><span class="hist-time">${timeAgo(t.created_at)}</span><div class="hist-actions"><button class="hist-btn pr" onclick="trackFromHist('${t.code}')">Track</button><button class="hist-btn" onclick="navigator.clipboard.writeText('${location.origin}/?code=${t.code}')">Copy</button></div></div>`;
+        body.appendChild(el);
+      });
+    }
+    function trackFromHist(code) {
+      document.getElementById('hist-pop').style.display = 'none';
+      document.getElementById('btn-hist').classList.remove('on');
+      switchMode('track');
+      document.getElementById('track-code').value = code;
+      connectTrack(code);
+    }
+    function timeAgo(ts) {
+      if (!ts) return '';
+      const s = Math.floor((Date.now() - ts) / 1000);
+      if (s < 60) return 'Just now';
+      const m = Math.floor(s / 60); if (m < 60) return `${m}m ago`;
+      const h = Math.floor(m / 60); if (h < 24) return `${h}h ago`;
+      return new Date(ts).toLocaleDateString([], { month: 'short', day: 'numeric' });
+    }
+
+    // ── Helpers ──
+    function distM(lat1, lon1, lat2, lon2) {
+      const R = 6371000, dLat = (lat2 - lat1) * Math.PI / 180, dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLon/2)**2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    }
+    function escapeHtml(str) { return (str || '').replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)); }
+
+    // ── Restore Session + URL Auto-Track ──
+    window.addEventListener('DOMContentLoaded', () => {
+      renderHist();
+
+      // Restore active trip from session
+      try {
+        const saved = sessionStorage.getItem(SESSION_KEY);
+        if (saved) {
+          activeTrip = JSON.parse(saved);
+          showActiveTripUI();
+          drawTarget(activeTrip.dest_lat, activeTrip.dest_lng, activeTrip.radius_m || 50);
+          startGPS();
+        }
+      } catch {}
+
+      // Auto-track from URL ?code=
+      const code = new URLSearchParams(window.location.search).get('code');
+      if (code) {
+        switchMode('track');
+        document.getElementById('track-code').value = code;
+        connectTrack(code);
+      }
+    });
+  </script>
+</body>
+</html>
