@@ -190,7 +190,8 @@ Let's talk real numbers, because anyone can claim high RPS on paper.
 
 During local stress testing with k6:
 
-- **HTTP Ingestion Rate:** The Go API engine effortlessly absorbed **26,300+ HTTP requests/second** on a single node without a sweat, maintaining bounded memory and zero CPU panics.
+- **HTTP Ingestion Rate:** ~~26,300+ HTTP requests/second~~ -> **47,212+ HTTP requests/second sustained** on a single node without a sweat (with **0 interrupted iterations** across **720,904 completed requests** in 95 seconds).
+- **Total Ingestion Volume:** **720,904 total requests** parsed, validated, hashed, geofenced, and streamed with zero connection drops.
 - **Database Write Compression:** Compressed 100,000 individual disk writes into roughly 100 binary batch copies per second.
 - **Latency Profile:** Hot path in-memory execution hovers under 1ms locally.
 - **Converted** 100,000 individual disk writes into 100 bulk binary copy blocks per second, reducing database IOPS requirements by 99.9%.

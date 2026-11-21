@@ -161,21 +161,9 @@ func (h *TripHandler) Ping(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Fetch trip metadata from Redis RAM
-	tripFromRedis, err := h.redis.GetTrip(r.Context(), code)
-	if err != nil {
-		h.log.Error("redis get trip failed during ping", "error", err, "code", code)
-		writeJSON(w, http.StatusInternalServerError, errorResp("internal cache error"))
-		return
-	}
-	if tripFromRedis == nil {
-		writeJSON(w, http.StatusNotFound, errorResp("trip not found or expired"))
-		return
-	}
-
-	// Execute atomic Redis Lua script (auth + update + geofence + pub/sub + stream)
-	status, err := h.redis.PingTrip(r.Context(), code, tokenHashHex,
-		req.Lat, req.Lng, req.SpeedMPS, tripFromRedis.ID)
+	// Execute atomic Redis Lua script in a single round-trip (auth + update + geofence + pub/sub + stream)
+	status, tripID, err := h.redis.PingTrip(r.Context(), code, tokenHashHex,
+		req.Lat, req.Lng, req.SpeedMPS)
 	if err != nil {
 		h.log.Error("ping lua execution failed", "error", err, "code", code)
 		writeJSON(w, http.StatusInternalServerError, errorResp("internal ping processing failure"))
@@ -192,12 +180,12 @@ func (h *TripHandler) Ping(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusConflict, errorResp("trip is no longer active"))
 	case "OK", "ARRIVED":
 		// If the user crossed into the destination arrival radius, update PostgreSQL asynchronously
-		if status == "ARRIVED" {
+		if status == "ARRIVED" && tripID != "" {
 			go func() {
 				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 				defer cancel()
-				if err := h.pg.UpdateTripStatus(ctx, tripFromRedis.ID, domain.StatusArrived); err != nil {
-					h.log.Error("async postgres status update failed", "error", err, "trip_id", tripFromRedis.ID)
+				if err := h.pg.UpdateTripStatus(ctx, tripID, domain.StatusArrived); err != nil {
+					h.log.Error("async postgres status update failed", "error", err, "trip_id", tripID)
 				}
 			}()
 		}

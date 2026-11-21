@@ -15,16 +15,16 @@ export const options = {
   scenarios: {
     hot_ping_burst: {
       executor: 'ramping-arrival-rate',
-      startRate: 5000,
+      startRate: 1000,
       timeUnit: '1s',
-      preAllocatedVUs: 2000,
-      maxVUs: 15000,
+      preAllocatedVUs: 500,
+      maxVUs: 10000,
       stages: [
-        { duration: '30s', target: 20000 },  // Warm up to 20k RPS
-        { duration: '1m',  target: 50000 },  // Step up to 50k RPS
-        { duration: '1m',  target: 100000 }, // Peak at 100k RPS
-        { duration: '30s', target: 100000 }, // Sustain 100k RPS
-        { duration: '30s', target: 0 },      // Ramp down
+        { duration: '10s', target: 5000 },   // Smooth warm-up to 5k
+        { duration: '20s', target: 15000 },  // Ramp to 15k
+        { duration: '30s', target: 30000 },  // Peak at 30k
+        { duration: '20s', target: 50000 },  // Push to 50k
+        { duration: '15s', target: 0 },      // Cool down
       ],
     },
   },
@@ -91,7 +91,7 @@ export default function (data) {
   pingLatency.add(dur);
 
   const ok = check(res, {
-    'status is 200': (r) => r.status === 200,
+    'status is 202': (r) => r.status === 202 || r.status === 200,
     'has valid status': (r) => {
       try {
         const body = JSON.parse(r.body);

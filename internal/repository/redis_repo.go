@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/redis/rueidis"
@@ -102,6 +103,7 @@ local dist = 6371000 * c
 
 -- If inside destination radius, transition status to ARRIVED
 local status = 'OK'
+local trip_id = data['trip_id'] or ARGV[6] or ''
 if dist <= radius then
     redis.call('HSET', KEYS[1], 'status', 'ARRIVED')
     status = 'ARRIVED'
@@ -109,7 +111,7 @@ end
 
 -- 6. Fan out the live location update to all SSE map viewers via Pub/Sub
 local event = cjson.encode({
-    trip_id    = ARGV[6],
+    trip_id    = trip_id,
     share_code = ARGV[7],
     lat        = tonumber(ARGV[2]),
     lng        = tonumber(ARGV[3]),
@@ -122,13 +124,16 @@ redis.call('PUBLISH', KEYS[2], event)
 -- 7. Append coordinate to the stream for async PostgreSQL batch insertion.
 -- MAXLEN ~ 1000000 ensures memory stays bounded even if PostgreSQL is temporarily offline.
 redis.call('XADD', KEYS[3], 'MAXLEN', '~', '1000000', '*',
-    'trip_id',     ARGV[6],
+    'trip_id',     trip_id,
     'lat',         ARGV[2],
     'lng',         ARGV[3],
     'speed_mps',   ARGV[4],
     'recorded_at', ARGV[5])
 
 -- 8. Return result code to the Go backend
+if status == 'ARRIVED' then
+    return status .. ':' .. trip_id
+end
 return status
 `)
 
@@ -286,7 +291,7 @@ func (r *RedisRepo) GetTrip(ctx context.Context, code string) (*domain.Trip, err
 //   - "UNAUTHORIZED": Provided owner token hash does not match.
 //   - "INACTIVE": Trip is already completed or expired.
 func (r *RedisRepo) PingTrip(ctx context.Context, code, tokenHashHex string,
-	lat, lng, speedMPS float64, tripID string) (string, error) {
+	lat, lng, speedMPS float64) (string, string, error) {
 
 	now := time.Now().UTC().Format(time.RFC3339Nano)
 	keys := []string{tripKey(code), channelKey(code), streamKey}
@@ -296,16 +301,22 @@ func (r *RedisRepo) PingTrip(ctx context.Context, code, tokenHashHex string,
 		strconv.FormatFloat(lng, 'f', -1, 64),
 		strconv.FormatFloat(speedMPS, 'f', -1, 64),
 		now,
-		tripID,
+		"", // trip_id is loaded directly from the Redis hash in Lua
 		code,
 	}
 
 	resp := pingScript.Exec(ctx, r.client, keys, args)
-	status, err := resp.ToString()
+	resStr, err := resp.ToString()
 	if err != nil {
-		return "", fmt.Errorf("ping lua exec: %w", err)
+		return "", "", fmt.Errorf("ping lua exec: %w", err)
 	}
-	return status, nil
+	parts := strings.SplitN(resStr, ":", 2)
+	status := parts[0]
+	tripID := ""
+	if len(parts) > 1 {
+		tripID = parts[1]
+	}
+	return status, tripID, nil
 }
 
 // EndTrip runs our atomic End Trip Lua script to manually conclude a trip.
