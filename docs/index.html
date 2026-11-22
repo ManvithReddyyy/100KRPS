@@ -1,0 +1,418 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f8fc">
+  <meta name="description" content="Personal project notes for 100KRPS, my real-time GPS tracking backend built with Go, Redis, and PostgreSQL.">
+  <title>100KRPS / project notes</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --paper: #f5f8fc;
+      --ink: #17365d;
+      --soft-ink: #315878;
+      --muted: #52718d;
+      --line: #c8d8e6;
+      --panel: #fff;
+      --accent: #2878c7;
+      --note-paper: #eaf3fb;
+      --doodle: #39784d;
+      --doodle-paper: #f0f7f0;
+      --mono: "Cascadia Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background: var(--paper);
+      color: var(--ink);
+      font: 13px/1.75 var(--mono);
+      text-transform: lowercase;
+    }
+    pre, .project-name { text-transform: none; }
+    .route-svg text, .doodle-text { text-transform: lowercase; }
+    a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+    a:hover { background: var(--accent); color: var(--paper); }
+    code, pre { font-family: var(--mono); }
+    .page { width: min(820px, calc(100% - 36px)); margin: 0 auto; }
+    .top {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 20px;
+      padding: 18px 0 14px;
+      border-bottom: 1px solid var(--line);
+      font-size: 11px;
+    }
+    .name { font-weight: 700; text-decoration: none; }
+    nav { display: flex; flex-wrap: wrap; gap: 14px; }
+    nav a { color: var(--muted); text-decoration: none; }
+    .intro { padding: 44px 0 32px; }
+    .kicker, .label { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .04em; }
+    h1, h2, h3, p { margin-top: 0; }
+    h1 { max-width: 700px; margin: 10px 0 15px; font-size: 23px; line-height: 1.45; font-weight: 600; }
+    h2 { margin: 0 0 14px; font-size: 16px; line-height: 1.6; font-weight: 700; }
+    h3 { margin: 0 0 8px; font-size: 12px; font-weight: 700; }
+    p { margin-bottom: 12px; color: var(--soft-ink); }
+    .intro p { max-width: 700px; }
+    .intro .meta { margin-top: 18px; color: var(--muted); font-size: 11px; }
+    .quick-links { display: flex; flex-wrap: wrap; gap: 15px; margin-top: 18px; font-size: 11px; }
+    .quick-links a { text-decoration: none; }
+    main section { padding: 27px 0; border-top: 1px solid var(--line); }
+    .section-id { margin-bottom: 8px; color: var(--muted); font-size: 10px; }
+    .lead { max-width: 720px; }
+
+    .route-box {
+      margin: 18px 0 13px;
+      padding: 17px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+    }
+    .route-title { margin-bottom: 11px; color: var(--muted); font-size: 10px; }
+    .route-svg { display: block; width: 100%; height: auto; }
+    .route-line { fill: none; stroke: var(--ink); stroke-width: 2; }
+    .route-marker { fill: var(--paper); stroke: var(--ink); stroke-width: 2; }
+    .route-caption { display: flex; justify-content: space-between; gap: 14px; margin-top: 8px; color: var(--muted); font-size: 10px; }
+    .doodle {
+      margin: 18px 0;
+      padding: 14px;
+      border: 1px solid #bfd2c1;
+      background: var(--doodle-paper);
+    }
+    .doodle-title { margin-bottom: 8px; color: var(--doodle); font-size: 10px; }
+    .doodle svg { display: block; width: 100%; height: auto; }
+    .doodle-stroke { fill: none; stroke: var(--doodle); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .doodle-node { fill: var(--doodle-paper); stroke: var(--doodle); stroke-width: 2; stroke-linejoin: round; }
+    .doodle-text { fill: var(--doodle); font: 11px var(--mono); }
+    .doodle-caption { margin: 7px 0 0; color: var(--doodle); font-size: 10px; }
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin: 20px 0;
+    }
+    .flow-step { padding: 12px; border: 1px solid var(--line); background: var(--panel); }
+    .flow-step b { display: block; margin-bottom: 6px; font-size: 11px; }
+    .flow-step span { display: block; color: var(--muted); font-size: 10px; line-height: 1.6; }
+    .flow-arrow { margin: 0 0 10px; color: var(--muted); text-align: center; font-size: 10px; }
+
+    .numbered { margin: 16px 0 0; padding: 0; list-style: none; counter-reset: item; }
+    .numbered li { position: relative; margin: 0; padding: 12px 0 12px 36px; border-top: 1px solid var(--line); counter-increment: item; }
+    .numbered li::before {
+      position: absolute;
+      left: 0;
+      color: var(--muted);
+      content: "0" counter(item) ".";
+    }
+    .numbered strong { color: var(--ink); }
+    .numbered p { margin: 4px 0 0; }
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    .note { padding: 12px 14px; border-left: 2px solid var(--accent); background: var(--note-paper); font-size: 11px; }
+
+    .stats { width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 11px; }
+    .stats th, .stats td { padding: 9px 8px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    .stats th { color: var(--muted); font-weight: 400; }
+    .stats td:first-child { white-space: nowrap; }
+    .small { color: var(--muted); font-size: 10px; }
+    pre {
+      overflow-x: auto;
+      margin: 12px 0;
+      padding: 13px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      color: var(--ink);
+      font-size: 11px;
+      line-height: 1.65;
+    }
+    .video-slot {
+      display: flex;
+      min-height: 90px;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 15px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+    }
+    .video-slot p { margin: 0; }
+    .video-mark { flex: 0 0 auto; padding: 8px 10px; border: 1px solid var(--accent); color: var(--accent); font-size: 10px; }
+    .video-embed {
+      position: relative;
+      width: 100%;
+      margin-top: 14px;
+      border: 1px solid var(--line);
+      background: #000;
+      aspect-ratio: 16 / 9;
+    }
+    .video-embed iframe {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      border: 0;
+    }
+    .bottom { padding: 20px 0 30px; border-top: 1px solid var(--line); }
+    .bottom-row { display: flex; justify-content: space-between; gap: 16px; align-items: baseline; }
+    .bottom-links { display: flex; flex-wrap: wrap; gap: 14px; }
+    .bottom-links a { font-size: 11px; }
+    .status { color: var(--muted); font-size: 10px; }
+
+    @keyframes travel { to { offset-distance: 100%; } }
+    @media (max-width: 620px) {
+      .top { align-items: flex-start; flex-direction: column; gap: 8px; }
+      .flow { grid-template-columns: 1fr 1fr; }
+      .two-col { grid-template-columns: 1fr; gap: 10px; }
+      .bottom-row { align-items: flex-start; flex-direction: column; }
+      .route-caption { flex-direction: column; gap: 2px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      .route-marker { animation: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header class="top">
+      <a class="name" href="#">manvith / <span class="project-name">100KRPS</span></a>
+      <nav aria-label="Page sections">
+        <a href="#overview">overview</a>
+        <a href="#how">how it works</a>
+        <a href="#results">results</a>
+      </nav>
+    </header>
+
+    <section class="intro" id="overview">
+      <div class="kicker">personal project / backend systems</div>
+      <h1>hey, i'm manvith. i built <span class="project-name">100KRPS</span> to understand how to optimize backend systems for real traffic, failures, slow users, and growing data.</h1>
+      <p><span class="project-name">100KRPS</span> is a real-time gps backend built with go, redis, and postgresql. it accepts a driver's location update, publishes the newest position to live viewers, and saves the location history in the background.</p>
+      <p>this page is for reading and learning. i want to explain everything i know from building the project: what each main part does, what data it handles, how it behaves under pressure, and where its own limits are.</p>
+      <div class="quick-links">
+        <a href="https://github.com/ManvithReddyyy/100KRPS" target="_blank" rel="noreferrer">source code on GitHub ↗</a>
+        <a href="#results">jump to benchmark notes ↓</a>
+      </div>
+      <p class="meta">stack: Go / Redis 7 / PostgreSQL 16 / Server-Sent Events / k6</p>
+    </section>
+
+    <main>
+      <section>
+        <div class="section-id">01 / the problem</div>
+        <h2>why not just insert every ping?</h2>
+        <p class="lead">because that is what everyone does on the first try, and it works right until it does not.</p>
+        <p>at low traffic, a ping hits postgres and everyone goes home happy. at high traffic, every ping starts fighting for database connections, disk writes, wal work, and attention. the live location update should not be standing in the same queue as historical storage.</p>
+        <p>so <span class="project-name">100KRPS</span> splits the job: <strong>show the newest position fast</strong>, then <strong>save the full history in the background</strong>. two jobs, two paths, fewer bottlenecks.</p>
+      </section>
+
+      <section id="how">
+        <div class="section-id">02 / the whole request path</div>
+        <h2>follow one ping for a minute</h2>
+        <p>picture a trip being created. the trip metadata and owner token are stored in redis, the driver sends a coordinate, and the live map waits for the next update.</p>
+
+        <div class="route-box">
+          <svg class="route-svg" viewBox="0 0 720 100" role="img" aria-label="An animated square moves from the Go API through Redis to PostgreSQL">
+              <path class="route-line" d="M25 42H695"/>
+              <rect x="17" y="34" width="16" height="16" fill="#17365d"/>
+              <rect x="689" y="34" width="16" height="16" fill="#17365d"/>
+            <rect class="route-marker" x="0" y="0" width="12" height="12" style="offset-path: path('M25 42H695'); animation: travel 6s linear infinite;"/>
+            <text x="20" y="78" font-family="monospace" font-size="12" fill="#315878">GO API</text>
+            <text x="305" y="78" font-family="monospace" font-size="12" fill="#315878">REDIS / LIVE STATE + STREAM</text>
+            <text x="625" y="78" font-family="monospace" font-size="12" fill="#315878">POSTGRES</text>
+          </svg>
+          <div class="route-caption">
+            <span>solid line = work that happens during a ping</span>
+            <span>moving square = one update on its way</span>
+          </div>
+        </div>
+
+        <div class="doodle">
+          <div class="doodle-title">a rough sketch of where the work goes</div>
+          <svg viewBox="0 0 880 220" role="img" aria-label="Green hand-drawn diagram: GPS pings enter Go, Redis splits them into a stream for batched PostgreSQL writes and Pub/Sub for the live map">
+            <defs>
+              <marker id="doodle-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                <path d="M0 0L6 3L0 6" fill="none" stroke="#39784d" stroke-width="1.5"/>
+              </marker>
+            </defs>
+            <path class="doodle-stroke" marker-end="url(#doodle-arrow)" d="M94 61C106 59 112 60 126 62"/>
+            <path class="doodle-stroke" marker-end="url(#doodle-arrow)" d="M240 62C254 61 264 61 279 62"/>
+            <path class="doodle-stroke" marker-end="url(#doodle-arrow)" d="M399 58C421 45 430 43 452 43"/>
+            <path class="doodle-stroke" marker-end="url(#doodle-arrow)" d="M574 43C594 43 606 43 627 43"/>
+            <path class="doodle-stroke" marker-end="url(#doodle-arrow)" d="M746 43C760 43 770 43 787 43"/>
+            <path class="doodle-stroke" marker-end="url(#doodle-arrow)" d="M397 75C424 91 431 151 452 158"/>
+            <path class="doodle-stroke" marker-end="url(#doodle-arrow)" d="M575 158C604 158 624 158 652 158"/>
+
+            <path class="doodle-node" d="M12 37Q15 34 19 36L91 35Q95 37 94 42L94 78Q92 82 88 81L16 82Q12 80 13 76Z"/>
+            <path class="doodle-node" d="M126 37Q130 35 135 36L236 35Q241 38 240 42L239 79Q237 82 232 81L130 82Q126 80 127 76Z"/>
+            <path class="doodle-node" d="M279 37Q284 34 289 36L395 35Q400 38 399 43L398 78Q396 82 391 81L283 82Q279 79 280 75Z"/>
+            <path class="doodle-node" d="M452 19Q456 16 461 18L569 17Q575 19 574 24L573 61Q571 65 567 64L456 65Q452 63 453 59Z"/>
+            <path class="doodle-node" d="M627 19Q631 16 636 18L741 17Q747 20 746 24L745 61Q743 65 738 64L631 65Q627 63 628 59Z"/>
+            <path class="doodle-node" d="M787 19Q791 17 795 18L865 17Q870 20 869 24L868 61Q866 65 862 64L791 65Q787 63 788 59Z"/>
+            <path class="doodle-node" d="M452 137Q456 134 461 136L570 135Q576 138 575 142L574 178Q572 182 568 181L456 182Q452 180 453 176Z"/>
+            <path class="doodle-node" d="M652 137Q656 134 661 136L774 135Q780 138 779 142L778 178Q776 182 772 181L656 182Q652 180 653 176Z"/>
+
+            <text class="doodle-text" x="27" y="59">GPS PINGS</text>
+            <text class="doodle-text" x="159" y="59">GO API</text>
+            <text class="doodle-text" x="315" y="59">REDIS</text>
+            <text class="doodle-text" x="475" y="42">STREAM BUFFER</text>
+            <text class="doodle-text" x="645" y="42">BATCH COPY</text>
+            <text class="doodle-text" x="798" y="42">POSTGRES</text>
+            <text class="doodle-text" x="478" y="160">PUB / SUB</text>
+            <text class="doodle-text" x="680" y="160">LIVE MAP</text>
+            <text class="doodle-text" x="12" y="113">fast response path</text>
+            <text class="doodle-text" x="452" y="205">history gets written in the background</text>
+            <text class="doodle-text" x="652" y="113">a slow viewer cannot block this lane</text>
+          </svg>
+          <p class="doodle-caption">The same ping has two jobs: update what people see now and build the history that can be queried later.</p>
+        </div>
+
+        <ol class="numbered">
+          <li><strong>go checks the request.</strong><p>the server applies limits and middleware, then the handler validates the payload and token. no drama, no extra database lookups.</p></li>
+          <li><strong>redis runs the whole hot path once.</strong><p>one lua script checks the trip, verifies the token hash, updates the location, runs haversine geofence math, and changes the trip status if the driver arrived.</p></li>
+          <li><strong>the ping gets sent two ways.</strong><p>one copy goes to live viewers through pub/sub. one copy gets appended to a redis stream for history. postgres is not sitting on the ping's hot path.</p></li>
+          <li><strong>the map receives just the latest useful frame.</strong><p>each go node keeps bounded channels for viewers. if someone's map falls behind, stale frames get dropped instead of blocking everyone else.</p></li>
+          <li><strong>a background worker saves the history.</strong><p>it reads up to 1,000 pings or waits 250 ms, bulk copies the batch, then acknowledges the stream. less tiny sql work, more organized disk work.</p></li>
+        </ol>
+      </section>
+
+      <section>
+        <div class="section-id">03 / why these pieces</div>
+        <h2>meet the team</h2>
+        <div class="two-col">
+          <div>
+            <h3>go</h3>
+            <p>go handles the HTTP path, validation, metrics, and live connections. the standard library keeps the request route easy to inspect instead of hiding it behind a big framework.</p>
+            <h3>redis</h3>
+            <p>redis holds the hot trip state, runs the lua transition, publishes live frames, and buffers ping history. it is the fast lane, not a magic "nothing ever fails" box.</p>
+            <h3>postgresql</h3>
+            <p>postgres stores trips and the long-term ping history. bulk copy does less tiny sql work and time partitioning can keep old history from becoming one gigantic table.</p>
+          </div>
+          <div>
+            <h3>server-sent events</h3>
+            <p>sse keeps a browser connected so location frames arrive as they happen. the map does not need to hammer the server with "anything new yet?" requests.</p>
+            <h3>redis streams</h3>
+            <p>the stream separates "accept this ping" from "save this ping forever." consumer state remembers pending messages, and stale pending work can be claimed again.</p>
+            <h3>metrics and load tests</h3>
+            <p>atomic counters track requests and latency. k6 creates the traffic and checks the answers, so changes can be compared instead of just vibe-checked.</p>
+          </div>
+        </div>
+        <p class="note"><strong>Demo status:</strong> this is a static project page, not a running backend. Redis and PostgreSQL are required when the API is started locally. An interactive hosted demo would deploy the API and both services together.</p>
+        <h3 style="margin-top:18px">one core, 12,000 requests</h3>
+        <p>the main unit of scale in <span class="project-name">100KRPS</span> is a cpu core. the target is simple: <strong>about 12,000 requests per second per core</strong>. this is measured on a complete ping flow, with redis and the rest of the setup capable of keeping up.</p>
+        <p>a request is not pure cpu the whole time. it waits on sockets, redis round trips, memory, scheduling, locks, parsing, and system calls. the 12k number means the cpu and the whole little pipeline are balanced enough that one core can finish about 12k complete request flows each second.</p>
+
+        <table class="stats">
+          <thead><tr><th>available cpu cores</th><th>12k-per-core target</th><th>project meaning</th></tr></thead>
+          <tbody>
+            <tr><td>1 core</td><td>12,000 rps</td><td>minimum single-core reference</td></tr>
+            <tr><td>2 cores</td><td>24,000 rps</td><td>parallel request scheduling</td></tr>
+            <tr><td>4 cores</td><td>48,000 rps</td><td>small server capacity target</td></tr>
+            <tr><td>8 cores</td><td>96,000 rps</td><td>approximately 100k rps target</td></tr>
+          </tbody>
+        </table>
+
+        <h3>i love how cores function</h3>
+        <p>an 8-core server has 8 places that can run work at the same time. go does not stick one request to one core forever; it schedules thousands of goroutines across the available processors while queues and caches change around.</p>
+        <p>so the rough math is <strong>8 x 12,000 = 96,000 rps</strong>. that is why the project calls the goal roughly 100k rps. it is the 12k-per-core target multiplied across 8 cores, not a random number pulled out of the cloud.</p>
+
+        <h3>what happens inside one request</h3>
+        <ol class="numbered">
+          <li><strong>the network is ready.</strong><p>the operating system accepts a connection and passes the http request to the server. cpu, interrupts, memory copies, and socket queues participate before application code begins.</p></li>
+          <li><strong>go performs the local work.</strong><p>middleware assigns request metadata, checks limits, parses the small payload, validates values, and prepares the redis command. short, predictable work helps every core stay available for more requests.</p></li>
+          <li><strong>redis performs the atomic operation.</strong><p>the ping script updates live state and appends history work in one event-loop operation. redis time is not free cpu time: network latency and redis scheduling still affect how quickly go receives the result.</p></li>
+          <li><strong>the response leaves the node.</strong><p>the server serializes a small response and writes it to the socket. throughput at the end of the pipeline is limited by the slowest shared resource, not just the fastest request handler.</p></li>
+        </ol>
+
+        <h3>how cores scale</h3>
+        <p>perfect scaling would mean 8 cores give exactly 8 times 1 core. real life has redis limits, socket limits, memory bandwidth, cache misses, connection churn, lock contention, interrupts, network cards, and load-balancer work. some of those do not scale just because the cpu count went up.</p>
+        <p>that is why 12k per core is a benchmark result, not a promise. as traffic rises, we watch throughput, p50/p95/p99 latency, interrupted iterations, cpu use, and errors. the test is only real if the load generator can sustain it too.</p>
+
+        <h3>why cores become the bottleneck</h3>
+        <p>a core becomes saturated when it has no breathing room—runnable work stacks up or contention keeps everything waiting. average cpu can look fine until queueing time spikes in the tail.</p>
+        <p>allocation pressure, mutexes, logging, redis round trips, and network work can all stop the 12k-per-core result from showing up. more cores do not fix a redis event-loop limit, disk i/o limit, or network bandwidth limit. the slowest shared piece wins.</p>
+
+        <h3>why this target is useful</h3>
+        <p>the per-core target gives a clean capacity estimate. 4 cores suggest 48k rps, 8 cores suggest 96k rps, and 16 cores suggest 192k rps—but only if redis, networking, disk, and the load generator can carry the extra work.</p>
+        <p>the whole benchmark is the point: cpu model, core count, machine, duration, target ramp, data path, result, latency, and interruptions should all travel together. otherwise a huge rps number is just a number.</p>
+      </section>
+
+      <section>
+        <div class="section-id">04 / why this helps under load</div>
+        <h2>what happens when stuff gets weird?</h2>
+        <p>redis alone does not make a system crash-proof. the real trick is using queues, bounded buffers, acknowledgments, and recovery paths so one slow piece does not ruin every other piece.</p>
+        <ol class="numbered">
+          <li><strong>Traffic spikes should not become database spikes.</strong><p>With a synchronous INSERT for every ping, a request burst becomes a database burst. Redis first updates the latest state and appends a stream event. The API returns without waiting for PostgreSQL, giving the database time to process fewer, larger writes.</p></li>
+          <li><strong>A temporary database slowdown becomes a buffer, not a crash.</strong><p>The worker reads up to 1,000 stream entries and flushes at least every 250 ms with <code>CopyFrom</code>. This absorbs a gap between incoming traffic and database throughput. The buffer is not infinite: the stream is capped near one million entries, so backlog and drain speed need monitoring.</p></li>
+          <li><strong>A dead flusher should not lose pending work.</strong><p>The worker acknowledges stream messages only after a database write succeeds. If a consumer dies before acknowledging, another worker uses <code>XAUTOCLAIM</code> to pick up entries idle beyond the configured threshold. This provides at-least-once processing, not exactly-once delivery.</p></li>
+          <li><strong>A slow viewer should not slow down ingestion.</strong><p>Each local SSE viewer gets a bounded channel with 16 slots. If the buffer fills, stale coordinates are dropped instead of blocking Redis message handling or creating an unbounded memory queue. On a live map, the newest position matters more than replaying old frames.</p></li>
+          <li><strong>An HTTP handler panic can be isolated to one request.</strong><p>Recovery middleware logs the panic and returns HTTP 500 instead of dropping the request socket. It contains handler errors, but not process, machine, Redis, or database failures.</p></li>
+          <li><strong>More API traffic can spread across API replicas.</strong><p>Trip state lives in shared Redis instead of only one Go process, allowing several API nodes to serve requests behind a load balancer. Redis and the stream worker must handle the additional shared load, and PostgreSQL must keep draining the stream.</p></li>
+        </ol>
+        <p>These choices handle more traffic by reducing per-ping database work, batching writes, and supporting API replicas. They manage more historical data by batching inserts and preparing the ping table for time-based partitions. The current migration still routes data to a default partition, so date-specific partitions must be created and maintained. Backlog depth also needs to stay visible so PostgreSQL can keep up.</p>
+        <p>There are still failure limits: a Redis outage makes the ping hot path unavailable; a PostgreSQL outage can allow the bounded stream to age out old entries. A real deployment needs health checks, alerts, durable Redis settings, capacity tests, backups, and a recovery plan.</p>
+        <p class="note"><strong>Durability note:</strong> Redis holds live state, runs the atomic ping operation, sends Pub/Sub events, and owns the stream queue. Redis-in-memory storage does not automatically mean durable storage. The sample Compose setup disables Redis persistence, and the Lua script caps the stream near one million entries. Production settings would need matching persistence, replication, retention, and backup goals.</p>
+      </section>
+
+      <section id="results">
+        <div class="section-id">05 / benchmark notes</div>
+        <h2>the benchmark receipts</h2>
+        <p>the readme has a local sustained run at <strong>47,212+ requests per second</strong>, 720,904 completed requests over 95 seconds, and zero interrupted iterations. the benchmark notes also list 104,200+ rps with 0.85 ms p50, 4.20 ms p95, and 11.40 ms p99.</p>
+        <table class="stats">
+          <thead><tr><th>item</th><th>reported result</th><th>where it is documented</th></tr></thead>
+          <tbody>
+            <tr><td>sustained throughput</td><td>47,212+ RPS</td><td>README, local run</td></tr>
+            <tr><td>completed requests</td><td>720,904 / 95 seconds</td><td>README, same run</td></tr>
+            <tr><td>throughput figure</td><td>104,200+ RPS</td><td>BENCHMARKS.md results table</td></tr>
+            <tr><td>latency in that table</td><td>0.85 ms p50 / 4.20 ms p95 / 11.40 ms p99</td><td>BENCHMARKS.md</td></tr>
+          </tbody>
+        </table>
+        <p class="small">The checked-in <code>loadtest/ping_bench.js</code> ramps arrival-rate stages up to a 50,000-per-second target over a 95-second test. It checks response status and body, then sets thresholds of p95 under 10 ms, p99 under 25 ms, and success rate over 99%. The 104,200+ figure is listed separately in the benchmark notes; its exact run configuration and video should accompany it for reproducibility. Results depend on the machine and setup.</p>
+        <p><a href="https://github.com/ManvithReddyyy/100KRPS/blob/main/BENCHMARKS.md" target="_blank" rel="noreferrer">Read the benchmark guide ↗</a> &nbsp; <a href="https://github.com/ManvithReddyyy/100KRPS/blob/main/loadtest/ping_bench.js" target="_blank" rel="noreferrer">Read the k6 ping test ↗</a></p>
+      </section>
+
+      <section>
+        <div class="section-id">06 / test recording</div>
+        <h2>full load-test video</h2>
+        <div class="video-slot">
+          <p>this is the full screen recording: the benchmark setup, docker stack, terminal traffic, and the k6 result.</p>
+          <span class="video-mark">VIDEO / WATCH HERE</span>
+        </div>
+        <div class="video-embed">
+          <iframe
+            src="https://iframe.mediadelivery.net/embed/817557/63a9e954-c6b8-4bfd-9f9d-13f38188679f"
+            title="100KRPS load-test recording"
+            loading="lazy"
+            allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture"
+            allowfullscreen>
+          </iframe>
+        </div>
+        <p class="small">The request path above is an animated visual explainer. This recording shows the test environment and terminal evidence.</p>
+      </section>
+
+      <section>
+        <div class="section-id">07 / the motivation</div>
+        <h2>why build this instead of another crud app?</h2>
+        <p>honestly, i just love backend systems.</p>
+        <p>the queueing, the trade-offs, the tiny decisions that turn into big latency spikes. yeah, that stuff is my kind of interesting.</p>
+        <p>i built this because reading architecture diagrams only gets you so far. i wanted to watch the system get faster, break, back up, recover, and teach me something in the process.</p>
+        <p>gps data gave me a fun excuse to learn about redis, concurrency, batching, cpu cores, recovery, and throughput without making it just another to-do app.</p>
+        <p>the goal isn't to say every backend is simple. the goal is to understand why each piece behaves the way it does under pressure.</p>
+        <p>now i want to take those lessons into better systems, bigger experiments, and my next build. if backend engineering is your thing too, this one's for you.</p>
+      </section>
+    </main>
+
+    <footer class="bottom" id="deployment">
+      <div class="bottom-row">
+        <div>
+          <div>thanks for reading :)</div>
+          <div class="status">publishable through GitHub Pages /docs; the API demo is not hosted yet</div>
+        </div>
+        <div class="bottom-links">
+          <a href="https://github.com/ManvithReddyyy/100KRPS" target="_blank" rel="noreferrer">GitHub repository ↗</a>
+          <span class="status">live backend: not hosted yet</span>
+        </div>
+      </div>
+    </footer>
+  </div>
+</body>
+</html>
